@@ -1,0 +1,68 @@
+name: build-kernel
+
+on:
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: "Repo sumber kernel (owner/nama)"
+        required: true
+        default: "clarencekopitiam/kernel_xiaomi_sm6250"
+      branch:
+        description: "Branch sumber"
+        required: true
+        default: "15-kinesis-sigma"
+      defconfig:
+        description: "Defconfig (path relatif dari arch/arm64/configs)"
+        required: true
+        default: "vendor/xiaomi/miatoll_defconfig"
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repo }}
+          ref: ${{ inputs.branch }}
+          fetch-depth: 1
+
+      - name: Pasang kebergantungan
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison flex libssl-dev libelf-dev cpio zip python3 git
+
+      - name: Toolchain (Proton clang, sesuai untuk kernel 4.14)
+        run: git clone --depth=1 https://github.com/kdrag0n/proton-clang $HOME/clang
+
+      - name: Build kernel
+        run: |
+          export PATH=$HOME/clang/bin:$PATH
+          ARGS="O=out ARCH=arm64 CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi-"
+          make $ARGS ${{ inputs.defconfig }}
+          scripts/config --file out/.config -e MAC80211 -e WLAN_VENDOR_MEDIATEK -e MT7601U
+          make $ARGS olddefconfig
+          echo "=== Semakan config ==="
+          grep -E "CONFIG_CFG80211=|CONFIG_MAC80211=|CONFIG_WLAN_VENDOR_MEDIATEK=|CONFIG_MT7601U=|CONFIG_LOCALVERSION=" out/.config
+          grep -q "CONFIG_MAC80211=y" out/.config
+          grep -q "CONFIG_MT7601U=y" out/.config
+          make -j$(nproc) $ARGS
+
+      - name: Senarai hasil
+        run: |
+          ls -la out/arch/arm64/boot/ || true
+          find out/arch/arm64/boot -name "*.dtb" | head -50 || true
+
+      - name: Muat naik hasil
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-mt7601u
+          path: |
+            out/arch/arm64/boot/Image
+            out/arch/arm64/boot/Image.gz
+            out/arch/arm64/boot/Image.gz-dtb
+            out/arch/arm64/boot/dtb.img
+            out/arch/arm64/boot/dtbo.img
+            out/arch/arm64/boot/dts/**/*.dtb
+            out/.config
+          if-no-files-found: warn
+          
