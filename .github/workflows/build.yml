@@ -39,7 +39,7 @@ jobs:
           export PATH=$HOME/clang/bin:$PATH
           ARGS="O=out ARCH=arm64 CC=clang LD=ld.lld AR=llvm-ar NM=llvm-nm OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump STRIP=llvm-strip CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi-"
           make $ARGS ${{ inputs.defconfig }}
-          scripts/config --file out/.config -e MAC80211 -e WLAN_VENDOR_MEDIATEK -e MT7601U
+          scripts/config --file out/.config -e MAC80211 -e WLAN_VENDOR_MEDIATEK -e MT7601U -d LLVM_POLLY
           make $ARGS olddefconfig
           echo "=== Semakan config ==="
           grep -E "CONFIG_CFG80211=|CONFIG_MAC80211=|CONFIG_WLAN_VENDOR_MEDIATEK=|CONFIG_MT7601U=|CONFIG_LOCALVERSION=" out/.config
